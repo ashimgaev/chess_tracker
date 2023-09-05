@@ -62,6 +62,7 @@ def apply_updates(users_map, updates_map: dict[str,str]):
         with open(DATA_FILE_PATH, mode='w', newline='', encoding='utf-8') as csvfile:
             csv_writer = csv.writer(csvfile)
             if csv_writer:
+                csv_writer.writerow(('Имя','ФШР ID','Разряд'))
                 for key, val in users_map.items():
                     csv_writer.writerow(val)
                 print('Изменения сохранены')
