@@ -48,7 +48,9 @@ def print_updates(users_map, updates_map: dict[str,str]):
     if len(updates_map) > 0:
         for key, val in updates_map.items():
             name, _, current_status = users_map[key]
-            print(f'{name}: изменен с [{current_status}] на [{val}]')
+            print(f'{name}, рейтинг изменен:')
+            print(f'    старый: {current_status}')
+            print(f'    новый : {val}')
     else:
         print('нет изменений')
 
