@@ -3,7 +3,9 @@ from win10toast import ToastNotifier
 import csv
 import requests
 from bs4 import BeautifulSoup
-import time
+import argparse
+import sys
+import configparser
 
 DATA_FILE_PATH = 'data.csv'
 
@@ -41,14 +43,12 @@ def clean_status_string(status_str: str):
     return " ".join(tmp.split())
 
 # prints updates map to terminal
-def print_updates(users_map, updates_map: dict[str,str], send_notification: bool = True):
+def print_updates(users_map, updates_map: dict[str,str]):
     print('\nСтатус:')
     if len(updates_map) > 0:
         for key, val in updates_map.items():
             name, _, current_status = users_map[key]
             print(f'{name}: изменен с [{current_status}] на [{val}]')
-        if send_notification == True:
-            send_toast(users_map, updates_map)
     else:
         print('нет изменений')
 
@@ -78,22 +78,33 @@ def show_confirm_dialog():
             print('Введите yes или no и нажмите Enter')
 
 def do_main():
-    print('hello')
-    BASE_URL = 'https://ratings.ruchess.ru'
-    
+    _, *params = sys.argv
+    args = appArgParser.parse_args()
+
+    TARGET_URL = 'https://ratings.ruchess.ru/people'
+
+    config = configparser.ConfigParser()
+    with open('config.ini', mode='r', encoding='utf-8') as cfgFile:
+        config.read_file(cfgFile)
+        TARGET_URL = config['DEFAULT']['target_url']
+
     users_map = {}
     updates_map = {}
 
     with open(DATA_FILE_PATH, newline='', encoding='utf-8') as csvfile:
         csv_reader = csv.reader(csvfile)
+        skip_desc_flag = False
         for row in csv_reader:
-            id = str(row[1])
-            users_map[id] = (str(row[0]), id, str(row[2]))
+            if skip_desc_flag:
+                id = str(row[1])
+                users_map[id] = (str(row[0]), id, str(row[2]))
+            else:
+                skip_desc_flag = True
 
     for _, val in users_map.items():
         name, id, current_status = val
         print(f'Анализ {name} ФШР ID({id}) ...')
-        http_response = requests.get(f'{BASE_URL}/people/{id}')
+        http_response = requests.get(f'{TARGET_URL}/{id}')
         if http_response.status_code >= 200 and http_response.status_code < 300:
             soup = BeautifulSoup(http_response.text, features='html.parser')
             item = soup.find('strong', string='Разряд')
@@ -106,12 +117,28 @@ def do_main():
                     updates_map[id] = status
             else:
                 print('Нет изменений')
+    
+    
+    print_updates(users_map, updates_map)
 
-    print_updates(users_map, updates_map, send_notification=True)
+    isDaemon=args.daemon
 
-    if len(updates_map) > 0:
-        if show_confirm_dialog() == True:
-            apply_updates(users_map, updates_map)
+    if isDaemon == True:
+        send_toast(users_map, updates_map)
+    else:
+        if len(updates_map) > 0:
+            if show_confirm_dialog() == True:
+                apply_updates(users_map, updates_map)
+
+appArgParser = argparse.ArgumentParser(description='Chess rate tracker',
+                                 prog=sys.argv[0],
+                                 usage='%(prog)s [OPTIONS]',
+                                 epilog='\n')
+
+appArgParser.add_argument('-d', '--daemon',
+                    action="store_true",
+                    default=False,
+                    help='used to specify to launch as daemon')
 
 if __name__ == '__main__':
     do_main()
